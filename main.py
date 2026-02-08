@@ -71,15 +71,17 @@ def load_user_preferences() -> dict:
         return defaults
 
 
-def calculate_provider_score(provider: dict, preferences: dict) -> float:
+def calculate_provider_score(provider: dict, prefs: "UserPreferences | dict") -> float:
     """
-    Score provider 0-100.
-    Formula: (rating * 10) - (distance * 2) + (10 if rating > 4.5 else 0)
+    Rating is 20 points per star (Max 100).
+    Deduct 5 points per mile.
+    Elite bonus for 4.7+ stars.
     """
-    rating = provider.get("rating", 0)
-    distance = provider.get("distance_miles", provider.get("distance", 0))
-    score = (rating * 10) - (distance * 2) + (10 if rating > 4.5 else 0)
-    return max(0.0, min(100.0, score))
+    score = provider.get("rating", 0) * 20
+    score -= provider.get("distance_miles", provider.get("distance", 0)) * 5
+    if provider.get("rating", 0) > 4.7:
+        score += 15
+    return round(max(0, score), 1)
 
 
 async def check_calendar(client: httpx.AsyncClient, preferences: dict) -> list[str]:
@@ -120,6 +122,13 @@ app = FastAPI(title="CallPilot", lifespan=lifespan)
 class StartCallRequest(BaseModel):
     phone_number: str
     task: str
+
+
+class UserPreferences(BaseModel):
+    max_distance: float = 5.0
+    min_rating: float = 4.0
+    prioritize_rating: bool = False
+    prioritize_distance: bool = False
 
 
 async def refine_instruction(client: httpx.AsyncClient, user_input: str) -> str:
@@ -212,6 +221,7 @@ async def _trigger_call(
 class StartSwarmRequest(BaseModel):
     user_phone: str
     objective: str
+    preferences: UserPreferences | None = None
 
 
 @app.post("/start-call")
@@ -257,9 +267,15 @@ async def start_swarm(request: StartSwarmRequest):
 
     client: httpx.AsyncClient = request.app.state.http_client
 
-    providers = load_providers()
-    preferences = load_user_preferences()
+    prefs = request.preferences or UserPreferences()
+    file_prefs = load_user_preferences()
+    preferences = {
+        "max_distance": prefs.max_distance,
+        "min_rating": prefs.min_rating,
+        "preferred_time": file_prefs.get("preferred_time", "morning"),
+    }
 
+    providers = load_providers()
     min_rating = preferences.get("min_rating", 0)
     max_distance = preferences.get("max_distance", 999)
 
@@ -270,7 +286,7 @@ async def start_swarm(request: StartSwarmRequest):
         and (p.get("distance_miles", p.get("distance", 999)) <= max_distance)
     ]
 
-    scored = [(p, calculate_provider_score(p, preferences)) for p in filtered]
+    scored = [(p, calculate_provider_score(p, prefs)) for p in filtered]
     top3_with_scores = sorted(scored, key=lambda x: x[1], reverse=True)[:3]
     top3 = [p for p, _ in top3_with_scores]
 
@@ -279,7 +295,7 @@ async def start_swarm(request: StartSwarmRequest):
 
     print(">> SWARM DEPLOYED: Calling", ", ".join(p.get("name", "?") for p in top3) + "...")
 
-    async def dispatch_one(p: dict, rank: int) -> dict:
+    async def dispatch_one(p: dict, rank: int, score: float) -> dict:
         to_number = (
             request.user_phone
             if p.get("phone") == "USER_TEST_PHONE"
@@ -288,8 +304,8 @@ async def start_swarm(request: StartSwarmRequest):
         dist = p.get("distance_miles", p.get("distance", 0))
         prompt = (
             f"You are calling {p.get('name', 'the provider')}. "
-            f"They are ranked #{rank} based on their {p.get('rating')} rating "
-            f"and {dist} miles distance. "
+            f"They have a match score of {score} and are {dist} miles away. "
+            f"They are ranked #{rank}. "
             f"Your goal is to negotiate a {preferences.get('preferred_time', 'morning')} slot. "
             f"The user is free during these times: {', '.join(free_slots)}. "
             f"Only request slots that fall within these windows. {refined}"
@@ -306,7 +322,7 @@ async def start_swarm(request: StartSwarmRequest):
         }
 
     results = await asyncio.gather(
-        *[dispatch_one(p, rank) for rank, p in enumerate(top3, 1)],
+        *[dispatch_one(p, rank, score) for (p, score), rank in zip(top3_with_scores, range(1, 4))],
         return_exceptions=True,
     )
 
