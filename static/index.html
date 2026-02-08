@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CallPilot // SWARM COMMAND CENTER</title>
+    <style>
+        :root { --neon: #00ff9d; --bg: #050505; --panel: #111; }
+        body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { border: 2px solid var(--neon); padding: 40px; width: 600px; max-width: 100%; background: rgba(0,255,157,0.05); box-shadow: 0 0 30px rgba(0,255,157,0.1); }
+        h1 { margin: 0 0 30px 0; text-align: center; letter-spacing: 4px; text-shadow: 0 0 10px var(--neon); font-size: 24px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; font-size: 12px; opacity: 0.8; margin-bottom: 5px; text-transform: uppercase; }
+        input { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: white; font-family: inherit; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
+        input:focus { border-color: var(--neon); outline: none; box-shadow: 0 0 15px rgba(0,255,157,0.2); }
+        button { width: 100%; padding: 15px; background: var(--neon); color: black; border: none; font-weight: bold; font-size: 18px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); transition: 0.2s; }
+        button:hover { transform: scale(1.02); box-shadow: 0 0 20px var(--neon); }
+        button:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
+        .live-feed { width: 100%; margin-top: 30px; border-collapse: collapse; border: 1px solid #333; font-size: 13px; }
+        .live-feed th, .live-feed td { padding: 12px; text-align: left; border: 1px solid #333; }
+        .live-feed th { background: rgba(0,255,157,0.1); text-transform: uppercase; letter-spacing: 2px; }
+        .live-feed td { color: #ccc; }
+        .live-feed .status-active { color: var(--neon); }
+        .live-feed .status-done { color: var(--neon); text-shadow: 0 0 5px var(--neon); }
+        .blink { animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .empty-state { padding: 30px; text-align: center; color: #666; font-size: 12px; }
+        .error { color: #ff3333; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CallPilot /// SWARM COMMAND CENTER</h1>
+        
+        <div class="input-group">
+            <label>Your Phone (E.164)</label>
+            <input type="text" id="user_phone" placeholder="+15551234567" value="">
+        </div>
+        
+        <div class="input-group">
+            <label>Mission Objective</label>
+            <input type="text" id="objective" placeholder="e.g. Dentist next week" value="">
+        </div>
+
+        <button onclick="initiateSwarm()" id="btn">INITIATE SWARM</button>
+
+        <table class="live-feed">
+            <thead>
+                <tr>
+                    <th>Provider</th>
+                    <th>DIALING</th>
+                    <th>NEGOTIATING</th>
+                    <th>COMPLETED</th>
+                </tr>
+            </thead>
+            <tbody id="agentFeed">
+                <tr>
+                    <td colspan="4" class="empty-state">No agents deployed. Initiate swarm to begin.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function initiateSwarm() {
+            const user_phone = document.getElementById('user_phone').value.trim();
+            const objective = document.getElementById('objective').value.trim();
+            const btn = document.getElementById('btn');
+            const tbody = document.getElementById('agentFeed');
+            
+            if (!user_phone || !objective) {
+                alert('Enter your phone number and mission objective.');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.innerText = 'DISPATCHING...';
+
+            try {
+                const res = await fetch('/start-swarm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_phone, objective })
+                });
+
+                const data = await res.json();
+                
+                if (res.ok && data.deployed_agents) {
+                    tbody.innerHTML = '';
+                    const agents = data.deployed_agents;
+                    
+                    agents.forEach(agent => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${escapeHtml(agent.name || 'Unknown')}</td>
+                            <td class="cell-dialing">-</td>
+                            <td class="cell-negotiating">-</td>
+                            <td class="cell-completed">-</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+
+                    simulateStatusUpdates(tbody.querySelectorAll('tr'));
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="4" class="error">Deployment failed: ${escapeHtml(data.detail || 'Unknown error')}</td></tr>`;
+                }
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="4" class="error">Network error: ${escapeHtml(e.message)}</td></tr>`;
+            }
+            
+            btn.disabled = false;
+            btn.innerText = 'INITIATE SWARM';
+        }
+
+        function simulateStatusUpdates(rows) {
+            const DIALING_MS = 2000;
+            const NEGOTIATING_MS = 3000;
+
+            rows.forEach((row, idx) => {
+                const cellDial = row.querySelector('.cell-dialing');
+                const cellNeg = row.querySelector('.cell-negotiating');
+                const cellDone = row.querySelector('.cell-completed');
+
+                // Stagger rows slightly
+                const baseDelay = idx * 300;
+
+                setTimeout(() => {
+                    cellDial.textContent = '...';
+                    cellDial.classList.add('status-active', 'blink');
+                }, baseDelay);
+
+                setTimeout(() => {
+                    cellDial.textContent = '✓';
+                    cellDial.classList.remove('blink');
+                    cellDial.classList.add('status-done');
+                    cellNeg.textContent = '...';
+                    cellNeg.classList.add('status-active', 'blink');
+                }, baseDelay + DIALING_MS);
+
+                setTimeout(() => {
+                    cellNeg.textContent = '✓';
+                    cellNeg.classList.remove('blink');
+                    cellNeg.classList.add('status-done');
+                    cellDone.textContent = '✓';
+                    cellDone.classList.add('status-done');
+                }, baseDelay + DIALING_MS + NEGOTIATING_MS);
+            });
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
