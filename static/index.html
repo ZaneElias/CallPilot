@@ -85,9 +85,9 @@
 
                 const data = await res.json();
                 
-                if (res.ok && data.deployed_agents) {
+                if (res.ok && data.swarmed_providers) {
                     tbody.innerHTML = '';
-                    const agents = data.deployed_agents;
+                    const agents = data.swarmed_providers;
                     
                     agents.forEach(agent => {
                         const tr = document.createElement('tr');
