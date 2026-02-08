@@ -80,19 +80,24 @@ async def refine_instruction(objective, context=""):
     return response.json()['choices'][0]['message']['content']
 
 async def trigger_single_call(phone, prompt):
-    """Triggers the ElevenLabs Call via the Twilio Integration."""
+    """Triggers the ElevenLabs Call with FORCED OVERRIDES."""
     url = "https://api.elevenlabs.io/v1/convai/twilio/outbound-call"
     
     headers = {
         "xi-api-key": os.getenv("ELEVENLABS_API_KEY"),
         "Content-Type": "application/json"
     }
-    
-    # We need a short opening sentence so the AI starts talking immediately
-    # We extract this from the prompt or just genericize it.
-    # For a hackathon, let's make it direct.
-    first_sentence = "Hello, I am calling to book an appointment."
-    
+
+    # 1. FORCE THE VOICE ID (Replace this string with the ID of the voice you want)
+    # Rachel: 21m00Tcm4TlvDq8ikWAM
+    # Brian: nPczCjzI2devNBz1zQrb
+    # Flash v2.5 works best with Rachel or Brian.
+    FORCED_VOICE_ID = "21m00Tcm4TlvDq8ikWAM" 
+
+    # 2. FORCE THE FIRST MESSAGE
+    # This tells the AI to shut up about "How can I help" and say this instead.
+    FIRST_MESSAGE = "Hello, I am calling from Call Pilot to book an appointment."
+
     payload = {
         "agent_id": os.getenv("AGENT_ID"),
         "agent_phone_number_id": os.getenv("AGENT_PHONE_NUMBER_ID"),
@@ -101,19 +106,28 @@ async def trigger_single_call(phone, prompt):
             "overrides": {
                 "agent": {
                     "prompt": {"prompt": prompt},
-                    "first_message": first_sentence  # <--- THIS IS THE FIX
+                    "first_message": FIRST_MESSAGE,
+                    "language": "en" 
+                },
+                "tts": {
+                    "voice_id": FORCED_VOICE_ID # <--- THIS FORCES THE VOICE
                 }
             }
         }
     }
     
+    print(f">> DIALING {phone} with Agent {os.getenv('AGENT_ID')}...")
+    
     async with httpx.AsyncClient() as client:
         try:
             res = await client.post(url, json=payload, headers=headers)
+            print(f">> API RESPONSE: {res.status_code}") # Debug print
             res.raise_for_status()
             return {"status": "success", "data": res.json()}
         except Exception as e:
             print(f"Call failed: {str(e)}")
+            if 'res' in locals():
+                print(f"API Error Body: {res.text}")
             return {"status": "error", "error": str(e)}
 
 # --- ROUTES ---
