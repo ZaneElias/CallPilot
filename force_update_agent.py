@@ -14,7 +14,7 @@ AGENT_ID = os.getenv("AGENT_ID")
 NEW_VOICE_ID = "cgSgspJ2msm6clMCkdW9" 
 
 # 2. Set the permanent opening line
-NEW_FIRST_MESSAGE = "Hello, I am calling from Call Pilot to book an appointment."
+NEW_FIRST_MESSAGE = "Hello, I'm calling from CallPilot to book an appointment for my client."
 
 async def force_update_agent():
     if not API_KEY or not AGENT_ID:

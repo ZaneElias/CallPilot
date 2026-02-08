@@ -3,154 +3,462 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CallPilot // SWARM COMMAND CENTER</title>
+    <title>CallPilot /// Command Node</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        cyber: {
+                            black: '#050505',
+                            dark: '#0A0F14',
+                            glass: 'rgba(20, 30, 40, 0.6)',
+                            neon: '#00F0FF',
+                            success: '#00FF94',
+                            alert: '#FF2A6D'
+                        }
+                    },
+                    fontFamily: {
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'spin-slow': 'spin 3s linear infinite',
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        :root { --neon: #00ff9d; --bg: #050505; --panel: #111; }
-        body { background: var(--bg); color: var(--neon); font-family: 'Courier New', monospace; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
-        .container { border: 2px solid var(--neon); padding: 40px; width: 600px; max-width: 100%; background: rgba(0,255,157,0.05); box-shadow: 0 0 30px rgba(0,255,157,0.1); }
-        h1 { margin: 0 0 30px 0; text-align: center; letter-spacing: 4px; text-shadow: 0 0 10px var(--neon); font-size: 24px; }
-        .input-group { margin-bottom: 20px; }
-        label { display: block; font-size: 12px; opacity: 0.8; margin-bottom: 5px; text-transform: uppercase; }
-        input { width: 100%; padding: 15px; background: #000; border: 1px solid #333; color: white; font-family: inherit; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
-        input:focus { border-color: var(--neon); outline: none; box-shadow: 0 0 15px rgba(0,255,157,0.2); }
-        button { width: 100%; padding: 15px; background: var(--neon); color: black; border: none; font-weight: bold; font-size: 18px; cursor: pointer; text-transform: uppercase; letter-spacing: 2px; margin-top: 10px; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); transition: 0.2s; }
-        button:hover { transform: scale(1.02); box-shadow: 0 0 20px var(--neon); }
-        button:disabled { background: #333; color: #666; cursor: not-allowed; transform: none; }
-        .live-feed { width: 100%; margin-top: 30px; border-collapse: collapse; border: 1px solid #333; font-size: 13px; }
-        .live-feed th, .live-feed td { padding: 12px; text-align: left; border: 1px solid #333; }
-        .live-feed th { background: rgba(0,255,157,0.1); text-transform: uppercase; letter-spacing: 2px; }
-        .live-feed td { color: #ccc; }
-        .live-feed .status-active { color: var(--neon); }
-        .live-feed .status-done { color: var(--neon); text-shadow: 0 0 5px var(--neon); }
-        .blink { animation: blink 1s infinite; }
-        @keyframes blink { 50% { opacity: 0; } }
-        .empty-state { padding: 30px; text-align: center; color: #666; font-size: 12px; }
-        .error { color: #ff3333; }
+        body { background-color: #020408; color: #E2E8F0; }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 20px rgba(0, 240, 255, 0.05);
+        }
+        .scanline {
+            width: 100%;
+            height: 100px;
+            z-index: 10;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0, 255, 148, 0.02) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 10s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100%; }
+        }
     </style>
 </head>
-<body>
-    <div class="container">
-        <h1>CallPilot /// SWARM COMMAND CENTER</h1>
-        
-        <div class="input-group">
-            <label>Your Phone (E.164)</label>
-            <input type="text" id="user_phone" placeholder="+15551234567" value="">
-        </div>
-        
-        <div class="input-group">
-            <label>Mission Objective</label>
-            <input type="text" id="objective" placeholder="e.g. Dentist next week" value="">
-        </div>
+<body class="font-mono min-h-screen flex flex-col relative overflow-x-hidden overflow-y-auto selection:bg-cyber-neon selection:text-black">
 
-        <button onclick="initiateSwarm()" id="btn">INITIATE SWARM</button>
+    <div class="absolute inset-0 z-0 opacity-20" 
+         style="background-image: radial-gradient(#1e293b 1px, transparent 1px); background-size: 24px 24px;"></div>
+    <div class="scanline"></div>
 
-        <table class="live-feed">
-            <thead>
-                <tr>
-                    <th>Provider</th>
-                    <th>DIALING</th>
-                    <th>NEGOTIATING</th>
-                    <th>COMPLETED</th>
-                </tr>
-            </thead>
-            <tbody id="agentFeed">
-                <tr>
-                    <td colspan="4" class="empty-state">No agents deployed. Initiate swarm to begin.</td>
-                </tr>
-            </tbody>
-        </table>
+    <div class="z-10 container mx-auto px-4 py-12 max-w-5xl" x-data="app()">
+        
+        <header class="flex justify-between items-end mb-12 border-b border-white/10 pb-6">
+            <div>
+                <h1 class="text-4xl font-bold tracking-tighter text-white">
+                    CALL<span class="text-cyber-neon">PILOT</span> <span class="text-lg font-normal text-gray-500">// Command Center</span>
+                </h1>
+                <p class="text-sm text-gray-400 mt-2 flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-cyber-success animate-pulse"></span>
+                    SYSTEM ONLINE // JESSICA AGENT READY
+                </p>
+            </div>
+            <div class="text-right hidden md:block">
+                <div class="text-xs text-gray-500">SERVER TIME</div>
+                <div class="text-xl font-bold" x-text="time"></div>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <div class="lg:col-span-5 space-y-6">
+                <div class="glass-panel rounded-xl p-8 relative overflow-hidden group">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-cyber-neon transition-all group-hover:h-full h-0"></div>
+                    
+                    <h2 class="text-xl font-bold text-white mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-3 text-cyber-neon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                        Mission Control
+                    </h2>
+
+                    <div class="mb-4 p-4 rounded-lg border border-cyber-neon/20 bg-cyber-neon/5">
+                        <h3 class="text-sm font-bold text-cyber-neon mb-3 uppercase tracking-wider">Mission Briefing</h3>
+                        <p class="text-[10px] text-gray-500 mb-3">Request an appointment (e.g. &quot;I need a dentist appointment this week&quot;). Agent will call the provider and book a suitable slot. Toggle Swarm for parallel outreach to up to 15 providers.</p>
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-cyber-neon mb-2 uppercase tracking-wider">Target Phone</label>
+                            <input type="tel" x-model="phone" placeholder="+1234567890" 
+                                   class="w-full bg-black/40 border border-white/10 rounded p-3 text-white focus:border-cyber-neon focus:ring-1 focus:ring-cyber-neon outline-none transition-all placeholder-gray-600 font-mono">
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-xs font-bold text-cyber-neon mb-2 uppercase tracking-wider">Objective</label>
+                            <textarea x-model="objective" rows="2" placeholder="e.g. I need a dentist appointment this week." 
+                                      class="w-full bg-black/40 border border-white/10 rounded p-3 text-white focus:border-cyber-neon focus:ring-1 focus:ring-cyber-neon outline-none transition-all placeholder-gray-600 font-mono resize-none"></textarea>
+                        </div>
+                        <div class="mb-4 p-3 rounded border border-white/10 bg-black/20">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="text-xs font-bold text-gray-400">Agent</span>
+                                <span class="w-2 h-2 rounded-full bg-gray-500" :class="{'bg-cyber-success animate-pulse': agentConfigured}"></span>
+                                <span class="text-[11px]" x-text="agentConfigured ? 'Configured' : 'Not configured'"></span>
+                            </div>
+                            <p class="text-[10px] text-gray-500">Set ELEVENLABS_API_KEY, AGENT_ID, AGENT_PHONE_NUMBER_ID in .env</p>
+                        </div>
+                        <div class="mb-4 p-3 rounded border border-white/10 bg-black/20">
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <span class="text-xs font-bold text-gray-400">Calendar</span>
+                                <button type="button" @click="loadCalendarStatus()" :disabled="loadingCalendar"
+                                        class="text-[10px] text-cyber-neon hover:underline disabled:opacity-50">
+                                    <span x-show="!loadingCalendar">Refresh</span>
+                                    <span x-show="loadingCalendar">Checking…</span>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-gray-500" :class="{'bg-cyber-success animate-pulse': calendarConnected}"></span>
+                                <span class="text-[11px]" x-text="calendarConnected ? 'Connected' : 'Not connected'"></span>
+                            </div>
+                            <p class="text-[10px] text-gray-500 mt-1">Prevent double booking: on when calendar connected.</p>
+                            <p x-show="!calendarConnected" class="text-[10px] text-gray-500 mt-1">Set GOOGLE_CALENDAR_CREDENTIALS_PATH in .env to connect.</p>
+                            <p class="text-[10px] text-gray-500 mt-1">Bookings are saved when the agent uses confirm_booking and Calendar or Make.com is configured.</p>
+                        </div>
+                        <div class="mb-4 p-3 rounded border border-white/10 bg-black/20">
+                            <div class="text-xs font-bold text-cyber-neon uppercase tracking-wider mb-3">Preferences</div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-[10px] text-gray-500 mb-1">Max distance (mi)</label>
+                                    <input type="number" x-model.number="maxDistance" min="1" max="50" class="w-full bg-black/40 border border-white/10 rounded p-2 text-white text-sm font-mono">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] text-gray-500 mb-1">Min rating (1–5)</label>
+                                    <input type="number" x-model.number="minRating" min="1" max="5" step="0.1" class="w-full bg-black/40 border border-white/10 rounded p-2 text-white text-sm font-mono">
+                                </div>
+                                <div class="flex flex-wrap gap-4">
+                                    <label class="flex items-center gap-2 cursor-pointer text-[11px]">
+                                        <input type="checkbox" x-model="prioritizeRating" class="rounded border-cyber-neon/50 text-cyber-neon">
+                                        Prioritize rating
+                                    </label>
+                                    <label class="flex items-center gap-2 cursor-pointer text-[11px]">
+                                        <input type="checkbox" x-model="prioritizeDistance" class="rounded border-cyber-neon/50 text-cyber-neon">
+                                        Prioritize distance
+                                    </label>
+                                </div>
+                                <p class="text-[10px] text-gray-500">Earliest availability is part of scoring.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 mb-4">
+                            <span class="text-xs text-gray-400">Mode:</span>
+                            <div class="flex rounded-lg border border-white/10 overflow-hidden">
+                                <button type="button" @click="swarmMode = false" 
+                                        :class="!swarmMode ? 'bg-cyber-neon/20 text-cyber-neon border-cyber-neon/50' : 'bg-black/40 text-gray-500 hover:text-gray-300'"
+                                        class="px-4 py-2 text-xs font-bold border-r border-white/10 transition-all">Solo</button>
+                                <button type="button" @click="swarmMode = true"
+                                        :class="swarmMode ? 'bg-cyber-neon/20 text-cyber-neon border-cyber-neon/50' : 'bg-black/40 text-gray-500 hover:text-gray-300'"
+                                        class="px-4 py-2 text-xs font-bold transition-all">Swarm</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" @click="deployAgent" :disabled="loading"
+                            class="w-full relative group overflow-hidden bg-cyber-neon/10 hover:bg-cyber-neon/20 border border-cyber-neon/50 text-cyber-neon font-bold py-4 px-6 rounded transition-all flex items-center justify-center gap-3">
+                        <span x-show="!loading" class="flex items-center gap-2" x-text="swarmMode ? 'DEPLOY AGENT SWARM' : 'DEPLOY SOLO AGENT'"></span>
+                        <span x-show="loading" class="flex items-center gap-2">
+                            <svg class="animate-spin h-5 w-5 text-cyber-neon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            INITIALIZING UPLINK...
+                        </span>
+                    </button>
+                    
+                    <p class="text-[10px] text-center text-gray-500 mt-4">
+                        SECURE CONNECTION • 256-BIT ENCRYPTION • VOICE AUTH
+                    </p>
+                </div>
+
+                <div class="glass-panel rounded-xl p-6 relative overflow-hidden">
+                    <h2 class="text-lg font-bold text-white mb-2 flex items-center">
+                        <span class="w-2 h-2 rounded-full bg-cyber-neon mr-2"></span>
+                        <span x-show="!swarmResultsFromDeploy">Discovery Engine — Live Ranking Table</span>
+                        <span x-show="swarmResultsFromDeploy">Ranked shortlist for confirmation</span>
+                    </h2>
+                    <p x-show="swarmResultsFromDeploy" class="text-[10px] text-gray-500 mb-3">Confirm with provider below or use the table to compare.</p>
+                    <button type="button" @click="loadProviders(); swarmResultsFromDeploy = false" :disabled="loadingProviders" class="text-xs text-cyber-neon hover:underline mb-3">
+                        <span x-show="!loadingProviders">Refresh providers</span>
+                        <span x-show="loadingProviders">Loading...</span>
+                    </button>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10 text-gray-400 text-xs uppercase tracking-wider">
+                                    <th class="pb-2 pr-2">#</th>
+                                    <th class="pb-2 pr-2">Provider</th>
+                                    <th class="pb-2 pr-2">Score</th>
+                                    <th class="pb-2 pr-2">Distance</th>
+                                    <th class="pb-2 pr-2">Rating</th>
+                                    <th class="pb-2">Specialty</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <template x-for="(p, i) in providers" :key="p.id">
+                                    <tr class="border-b border-white/5 hover:bg-white/5 transition-colors"
+                                        :class="i === 0 ? 'bg-cyber-neon/10 border-l-2 border-l-cyber-neon' : ''">
+                                        <td class="py-2 pr-2">
+                                            <span x-show="i === 0" class="text-cyber-neon font-bold text-xs">TOP MATCH</span>
+                                            <span x-show="i !== 0" x-text="i + 1"></span>
+                                        </td>
+                                        <td class="py-2 pr-2 font-medium" x-text="p.name"></td>
+                                        <td class="py-2 pr-2 text-cyber-neon" x-text="p.match_score"></td>
+                                        <td class="py-2 pr-2" x-text="p.distance_miles + ' mi'"></td>
+                                        <td class="py-2 pr-2" x-text="p.rating"></td>
+                                        <td class="py-2 text-gray-500" x-text="p.specialty || '—'"></td>
+                                    </tr>
+                                </template>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p x-show="providers.length === 0 && !loadingProviders" class="text-gray-500 text-xs mt-2">No providers loaded. Click Refresh providers.</p>
+                    <p class="text-[10px] text-gray-500 mt-3">Ranking uses: earliest availability, rating, distance, and user preference weighting.</p>
+                </div>
+            </div>
+
+            <div class="lg:col-span-7 space-y-4">
+                <div class="glass-panel rounded-xl p-3 flex flex-wrap items-center gap-4 border border-white/5">
+                    <span class="text-xs font-bold text-gray-400">Agent tools</span>
+                    <span class="text-[11px] text-cyber-neon">Calendar queries</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-[11px] text-cyber-neon">Provider lookup</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-[11px] text-cyber-neon">Distance</span>
+                    <span class="text-gray-600">|</span>
+                    <span class="text-[11px] text-cyber-neon">Slot validation / confirmation</span>
+                </div>
+                <div class="glass-panel rounded-xl h-full min-h-[500px] flex flex-col p-1">
+                    <div class="bg-black/40 p-3 border-b border-white/5 flex justify-between items-center">
+                        <span class="text-xs font-bold text-gray-400">TELEMETRY TERMINAL</span>
+                        <div class="flex items-center gap-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-red-500" :class="{'animate-pulse bg-green-500': active}"></span>
+                            <span class="text-[10px] text-gray-500" x-text="active ? 'VOICE CHANNEL OPEN' : 'STANDBY'"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 p-6 font-mono text-sm overflow-y-auto space-y-3" id="console">
+                        <template x-for="log in logs" :key="log.id">
+                            <div class="border-l-2 pl-4 py-1 animate-fade-in" 
+                                 :class="{
+                                    'border-gray-700 text-gray-500': log.type === 'info',
+                                    'border-cyber-neon text-cyber-neon bg-cyber-neon/5': log.type === 'success',
+                                    'border-cyber-alert text-cyber-alert': log.type === 'error',
+                                    'border-white text-white': log.type === 'agent'
+                                 }">
+                                <div class="text-[10px] opacity-50 mb-1" x-text="log.time"></div>
+                                <div x-text="log.message"></div>
+                            </div>
+                        </template>
+                        
+                        <div x-show="logs.length === 0" class="h-full flex flex-col items-center justify-center text-gray-700 opacity-50">
+                            <svg class="w-16 h-16 mb-4 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                            <p>AWAITING COMMAND INPUT...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function initiateSwarm() {
-            const user_phone = document.getElementById('user_phone').value.trim();
-            const objective = document.getElementById('objective').value.trim();
-            const btn = document.getElementById('btn');
-            const tbody = document.getElementById('agentFeed');
-            
-            if (!user_phone || !objective) {
-                alert('Enter your phone number and mission objective.');
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.innerText = 'DISPATCHING...';
+        function app() {
+            return {
+                phone: '',
+                objective: '',
+                swarmMode: true,
+                loading: false,
+                loadingProviders: false,
+                active: false,
+                time: new Date().toLocaleTimeString(),
+                logs: [],
+                providers: [],
+                calendarConnected: false,
+                maxDistance: 20,
+                minRating: 1,
+                prioritizeRating: false,
+                prioritizeDistance: false,
+                swarmResultsFromDeploy: false,
+                loadingCalendar: false,
+                shownBookingIds: [],
+                bookingPollIntervalId: null,
+                agentConfigured: false,
 
-            try {
-                const res = await fetch('/start-swarm', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_phone, objective })
-                });
+                init() {
+                    setInterval(() => this.time = new Date().toLocaleTimeString(), 1000);
+                    this.addLog('Neural Link Established.', 'success');
+                    this.addLog('Connected to ElevenLabs Neural Engine.', 'info');
+                    this.addLog('Ready for input.', 'success');
+                    this.loadProviders();
+                    this.loadCalendarStatus();
+                    this.loadAgentStatus();
+                },
 
-                const data = await res.json();
-                
-                if (res.ok && data.swarmed_providers) {
-                    tbody.innerHTML = '';
-                    const agents = data.swarmed_providers;
-                    
-                    agents.forEach(agent => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td>${escapeHtml(agent.name || 'Unknown')}</td>
-                            <td class="cell-dialing">-</td>
-                            <td class="cell-negotiating">-</td>
-                            <td class="cell-completed">-</td>
-                        `;
-                        tbody.appendChild(tr);
+                async loadAgentStatus() {
+                    try {
+                        const res = await fetch('/agent/status');
+                        const data = res.ok ? await res.json().catch(() => ({})) : {};
+                        this.agentConfigured = data.configured === true;
+                    } catch (e) {
+                        this.agentConfigured = false;
+                    }
+                },
+
+                async loadCalendarStatus() {
+                    this.loadingCalendar = true;
+                    this.calendarConnected = false;
+                    try {
+                        const res = await fetch('/calendar/status');
+                        const data = res.ok ? await res.json().catch(() => ({})) : {};
+                        this.calendarConnected = data.connected === true;
+                    } catch (e) {
+                        this.calendarConnected = false;
+                    } finally {
+                        this.loadingCalendar = false;
+                    }
+                },
+
+                addLog(message, type = 'info') {
+                    this.logs.unshift({
+                        id: Date.now(),
+                        time: new Date().toLocaleTimeString(),
+                        message: message,
+                        type: type
                     });
+                },
 
-                    simulateStatusUpdates(tbody.querySelectorAll('tr'));
-                } else {
-                    tbody.innerHTML = `<tr><td colspan="4" class="error">Deployment failed: ${escapeHtml(data.detail || 'Unknown error')}</td></tr>`;
+                startBookingPoll() {
+                    if (this.bookingPollIntervalId) clearInterval(this.bookingPollIntervalId);
+                    const start = Date.now();
+                    const pollMs = 6000;
+                    const stopAfterMs = 120000;
+                    this.bookingPollIntervalId = setInterval(() => {
+                        if (Date.now() - start > stopAfterMs) {
+                            clearInterval(this.bookingPollIntervalId);
+                            this.bookingPollIntervalId = null;
+                            return;
+                        }
+                        this.pollBookings();
+                    }, pollMs);
+                    this.pollBookings();
+                },
+
+                async pollBookings() {
+                    try {
+                        const res = await fetch('/bookings/recent');
+                        const data = res.ok ? await res.json().catch(() => ({})) : {};
+                        const bookings = data.bookings || [];
+                        for (const b of bookings) {
+                            const id = b.id || (b.provider_name + '|' + b.date + '|' + b.time);
+                                if (!this.shownBookingIds.includes(id)) {
+                                this.shownBookingIds.push(id);
+                                let msg = 'Booking confirmed: ' + (b.provider_name || 'Provider') + ' — ' + (b.date || '') + ' at ' + (b.time || '');
+                                if (b.calendar_created) msg += ' (saved to calendar)';
+                                if (b.forwarded) msg += ' (sent to Make.com)';
+                                this.addLog(msg, 'success');
+                            }
+                        }
+                    } catch (e) {}
+                },
+
+                async loadProviders() {
+                    this.loadingProviders = true;
+                    try {
+                        const res = await fetch('/providers');
+                        this.providers = await res.json();
+                    } catch (e) {
+                        this.addLog('Failed to load providers: ' + e.message, 'error');
+                    } finally {
+                        this.loadingProviders = false;
+                    }
+                },
+
+                async deployAgent() {
+                    if (!this.phone || !this.objective) {
+                        this.addLog('ERROR: Missing required fields.', 'error');
+                        return;
+                    }
+
+                    this.loading = true;
+                    this.active = true;
+                    this.addLog('Analyzing Latency...', 'info');
+                    this.addLog(`Objective: "${this.objective}"`, 'agent');
+                    this.addLog(`Initializing call sequence to ${this.phone}...`, 'info');
+
+                    try {
+                        if (this.swarmMode) {
+                            const response = await fetch('/start-swarm', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_phone: this.phone,
+                                    objective: this.objective,
+                                    preferences: {
+                                        max_distance: this.maxDistance,
+                                        min_rating: this.minRating,
+                                        prioritize_rating: this.prioritizeRating,
+                                        prioritize_distance: this.prioritizeDistance
+                                    }
+                                })
+                            });
+                            const result = await response.json();
+                            if (result.status === 'Swarm Deployed') {
+                                this.swarmResultsFromDeploy = true;
+                                this.addLog('Agent Alpha Dispatched.', 'agent');
+                                this.addLog('Neural Link Established.', 'success');
+                                this.addLog('Swarm deployed: ' + result.deployed_agents + ' agents active.', 'success');
+                                if (result.swarmed_providers && result.swarmed_providers.length) {
+                                    this.providers = result.swarmed_providers;
+                                }
+                                this.addLog('Tool: check_availability', 'info');
+                                this.addLog('Tool: confirm_booking', 'info');
+                                this.addLog('Monitoring voice channel...', 'info');
+                                setTimeout(() => this.addLog('Status: Negotiating time slot...', 'info'), 6000);
+                                this.startBookingPoll();
+                            } else {
+                                this.addLog('X Connection Failed: ' + (result.error || result.detail || 'Unknown Error'), 'error');
+                            }
+                        } else {
+                            const response = await fetch('/start-call', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    phone_number: this.phone,
+                                    objective: this.objective
+                                })
+                            });
+                            const result = await response.json();
+                            if (result.status === 'success') {
+                                this.addLog('Agent Alpha Dispatched.', 'agent');
+                                this.addLog('Neural Link Established.', 'success');
+                                this.addLog('Tool: check_availability', 'info');
+                                this.addLog('Tool: confirm_booking', 'info');
+                                this.addLog('Monitoring voice channel...', 'info');
+                                setTimeout(() => this.addLog('Status: Negotiating time slot...', 'info'), 6000);
+                                this.startBookingPoll();
+                            } else {
+                                this.addLog('X Connection Failed: ' + (result.error || result.detail || 'Unknown Error'), 'error');
+                            }
+                        }
+                    } catch (error) {
+                        this.addLog('CRITICAL ERROR: ' + error.message, 'error');
+                    } finally {
+                        this.loading = false;
+                        setTimeout(() => { this.active = false; this.addLog('Call sequence completed.', 'success'); }, 15000);
+                    }
                 }
-            } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="4" class="error">Network error: ${escapeHtml(e.message)}</td></tr>`;
             }
-            
-            btn.disabled = false;
-            btn.innerText = 'INITIATE SWARM';
-        }
-
-        function simulateStatusUpdates(rows) {
-            const DIALING_MS = 2000;
-            const NEGOTIATING_MS = 3000;
-
-            rows.forEach((row, idx) => {
-                const cellDial = row.querySelector('.cell-dialing');
-                const cellNeg = row.querySelector('.cell-negotiating');
-                const cellDone = row.querySelector('.cell-completed');
-
-                // Stagger rows slightly
-                const baseDelay = idx * 300;
-
-                setTimeout(() => {
-                    cellDial.textContent = '...';
-                    cellDial.classList.add('status-active', 'blink');
-                }, baseDelay);
-
-                setTimeout(() => {
-                    cellDial.textContent = '✓';
-                    cellDial.classList.remove('blink');
-                    cellDial.classList.add('status-done');
-                    cellNeg.textContent = '...';
-                    cellNeg.classList.add('status-active', 'blink');
-                }, baseDelay + DIALING_MS);
-
-                setTimeout(() => {
-                    cellNeg.textContent = '✓';
-                    cellNeg.classList.remove('blink');
-                    cellNeg.classList.add('status-done');
-                    cellDone.textContent = '✓';
-                    cellDone.classList.add('status-done');
-                }, baseDelay + DIALING_MS + NEGOTIATING_MS);
-            });
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
         }
     </script>
 </body>
